@@ -27,58 +27,74 @@ def detect_provider(key: str):
             return provider, env_var, model
     return None, None, None
 
-# Response getter and setter
+# Message getter and setter
 def get_message() -> dict:
     return _config.get("message")
 
 def set_message(msg: str):
-    content = (
-    f"Você vai resolver o seguinte problema de programação linear (após [PROBLEMA]). "
-    f"Retorne APENAS uma linha neste formato exato, sem explicações, sem quebras de linha: "
-    f"{{tipo, função_objetivo, variáveis, restrições}} "
-    f"Onde: "
-    f"- tipo: exatamente 'LpMaximize' ou 'LpMinimize' "
-    f"- função_objetivo: ex: 50*x+30*y (variaveis devem ser de a-z)"
-    f"- variáveis: separadas por ponto e vírgula, ex: x;y "
-    f"- restrições: separadas por ponto e vírgula, ex: 4*x+2*y<=100;3*x+2*y<=90;y>=10 "
-    f"[EXEMPLO DE RESPOSTA] {{LpMaximize, 50*x+30*y, x;y, 4*x+2*y<=100;3*x+2*y<=90;y>=10}} "
-    f"[PROBLEMA] {msg}"
-)
+    reasoning_prompt = (
+        f"Analise este problema de Programação Linear e estruture os dados:\n"
+        f"1) Monte uma tabela: Variável | Preço | Custo | Margem% | Lucro | Recursos consumidos | Limites\n"
+        f"2) Calcule o lucro de cada variável:\n"
+        f"   - Preço + Custo: lucro = preço - custo\n"
+        f"   - Preço + Custo + Margem: lucro = preço / (1.0 + margem%) - custo\n"
+        f"   - Lucro + Margem (sem preço): custo = lucro / (1.0 + margem%); use lucro informado no FO\n"
+        f"   - Só Lucro: use diretamente no FO\n"
+        f"3) Identifique a função objetivo (maximizar ou minimizar)\n"
+        f"4) Liste todas as restrições com coeficientes corretos\n\n"
+        f"[PROBLEMA] {msg}"
+    )
 
-    message_payload = {
-        "model": _config["model"],
-        "messages": [
-            {"role": "user", "content": content}
-        ]
-    }
-    _config["message"] = message_payload
+    format_prompt_template = (
+        f"Com base na análise abaixo, retorne APENAS esta linha, sem explicações, sem quebras:\n"
+        f"{{tipo, função_objetivo, variáveis, restrições}}\n"
+        f"- tipo: 'LpMaximize' ou 'LpMinimize'\n"
+        f"- função_objetivo: ex: 3.5*x+4*y\n"
+        f"- variáveis: separadas por ';', ex: x;y\n"
+        f"- restrições: separadas por ';', ex: 5*x+4*y<=1200;x>=0\n"
+        f"[EXEMPLO] {{LpMaximize, 50*x+30*y, x;y, 4*x+2*y<=100;3*x+2*y<=90;y>=10}}\n\n"
+        f"[ANÁLISE]\n{{reasoning}}"
+    )
+
+    _config["reasoning_prompt"]       = reasoning_prompt
+    _config["format_prompt_template"] = format_prompt_template
+    _config["message"] = {"model": _config["model"]}
 
 # Executes the call and handles the AI ​response
+def call_api(prompt: str) -> str:
+    provider = _config.get("provider")
+    model = _config.get("model")
+
+    if provider == "gemini":
+        client = genai.Client(api_key=get_api_key())
+        response = client.models.generate_content(model=model, contents=prompt)
+        return response.text.strip()
+
+    elif provider == "openrouter":
+        client = OpenAI(api_key=get_api_key(), base_url="https://openrouter.ai/api/v1")
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content.strip()
+
+    return "Provider não configurado."
+
+# Execute two-shot: reasoning → formatting
 def request_ai():
     provider = _config.get("provider")
-
-    payload = get_message()
-    if not provider or not payload:
-        return "Configuração ou mensagem ausente."
+    if not provider:
+        return "Configuração ausente."
 
     try:
-        if provider == "gemini":
-            client = genai.Client(api_key=get_api_key())
-            response = client.models.generate_content(
-                model=payload["model"],
-                contents=payload["messages"][0]["content"]
-            )
-            return response.text
-            
-        elif provider == "openrouter":
-            client = OpenAI(
-                api_key=get_api_key(),
-                base_url="https://openrouter.ai/api/v1"
-            )
-            response = client.chat.completions.create(
-                model=payload["model"],
-                messages=payload["messages"]
-            )
-            return response.choices[0].message.content
+        # Call 1: reasoning
+        reasoning = call_api(_config["reasoning_prompt"])
+
+        # Call 2: formatting
+        format_prompt = _config["format_prompt_template"].replace("{reasoning}", reasoning)
+        result = call_api(format_prompt)
+
+        return result
+
     except Exception as e:
         return f"Erro na requisição: {e}"
