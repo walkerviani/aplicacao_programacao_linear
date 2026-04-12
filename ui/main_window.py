@@ -1,12 +1,13 @@
 import sys # Only needed for access to command line arguments
 from PySide6.QtWidgets import QWidget, QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton
+from result_panel import ResultPanel
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
         # Window title
-        self.setWindowTitle("Cálculo de Programação Linear")
+        self.setWindowTitle("Linear Programming Calculation")
         
         # Set the minimum screen size
         self.setMinimumSize(800,600)
@@ -16,68 +17,86 @@ class MainWindow(QMainWindow):
         # Left view is the input session
         leftView = QVBoxLayout()
 
-        # App title
+        # App Title Label
         title = QLabel()
         title.setText("Linear Programming Calculator")
         title.setStyleSheet("""
         font: 24px Arial;
         color: #000000;
         font-weight: bold;
+        padding-bottom:10px;
         """)
-        title.setMaximumHeight(50)
         leftView.addWidget(title)
 
-        # User input hint message
+        # User Input Message
         message1 = QLabel()
         message1.setText("Insert your problem:")
         message1.setStyleSheet("""
         font: 16px Arial;
         color: #000000;
         """)
-        message1.setMaximumHeight(25)
         leftView.addWidget(message1)
 
-        # User input text
-        textInput = QTextEdit()
-        textInput.setStyleSheet("""
+        # User Input
+        self.textInput = QTextEdit()
+        self.textInput.setStyleSheet("""
         font: 15px Arial;
         background-color: #ffffff;
         color: #000000;
-        border: 1px solid #000000""")
-        textInput.setMaximumHeight(200)
-        leftView.addWidget(textInput)
+        border: 1px solid #000000;
+        margin-bottom: 10px;
+        """)
+        leftView.addWidget(self.textInput)
 
-        # Send information button
+        # Send Button
         button = QPushButton()
         button.setText("Send")
         button.setStyleSheet("""
+        QPushButton {
         background-color:#000000;
-        color: #ffffff""")
-        button.setMaximumHeight(50)
+        color: #ffffff;
+        padding:10px;
+        }
+        QPushButton:hover{
+        background-color:#333333;
+        }
+        QPushButton:pressed{
+        background-color:#555555;
+        }""")
+        button.clicked.connect(self.on_send_clicked) # Set button function
         leftView.addWidget(button)
 
-        # Output hint message
+        # Result Label Message
         message2 = QLabel()
         message2.setText("Result:")
         message2.setStyleSheet("""
         font: 16px Arial;
         color: #000000;
+        padding-top:20px;
         """)
-        message2.setMaximumHeight(25)
         leftView.addWidget(message2)
 
-        # Result label
-        result = QLabel()
-        result.setStyleSheet("""
+        # Result Label
+        self.result = QTextEdit()
+        self.result.setReadOnly(True) 
+        self.result.setStyleSheet("""
+        font: 15px Arial;
         background-color: #ffffff;
         color: #000000;
-        border: 1px solid #000000""")
-        result.setMaximumHeight(100)
-        leftView.addWidget(result)
+        border: 1px solid #000000;
+        """)
+        leftView.addWidget(self.result)
+
+        # Push all widgets to the top
+        leftView.addStretch() 
 
         # Right view is the graphic session
         rightView = QVBoxLayout()
-        rightView.addWidget(QLabel('Graphic'))
+        # Set a margin
+        rightView.setContentsMargins(10, 10, 10, 10)
+
+        self.result_panel = ResultPanel()
+        rightView.addWidget(self.result_panel)
 
         container.addLayout(leftView, 1)
         container.addLayout(rightView, 2)
@@ -87,6 +106,10 @@ class MainWindow(QMainWindow):
         widget.setStyleSheet("background-color: #E3E3E3")
         widget.setLayout(container)
         self.setCentralWidget(widget)
+
+    def on_send_clicked(self):
+        text = self.textInput.toPlainText() # User text
+        self.result.setText(text)
 
 
 # The svs.argv allows to use command line arguments on the app
