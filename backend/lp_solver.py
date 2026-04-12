@@ -6,6 +6,7 @@ _result = {
     "success": False,
     "variables": {},
     "of": None,
+    "of_value": None,
     "of_type": None,
     "restrictions": [],
     "parts": []
@@ -53,10 +54,11 @@ def solve_linear_problem():
 
         _result = {
             "success": True,
-            "variables": {v.name: v.value() for v in prob.variables()},  
-            "of": value(prob.objective),
-            "of_type": parts[0], 
-            "restrictions": restrictions,
+            "variables": {v.name: v.value() for v in prob.variables()}, # Ex: {"x": 10.0, "y": 20.0}
+            "of": prob.objective, # Ex: "50*x+30*y"
+            "of_value": value(prob.objective), # Ex: 800.0 
+            "of_type": parts[0], # Ex: "LpMaximize"
+            "restrictions": restrictions, # Ex: ["4*x+2*y<=100", "3*x+2*y<=90", "y>=10"]
             "parts": parts
         }
         return _result
