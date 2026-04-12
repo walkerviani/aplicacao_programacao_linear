@@ -18,14 +18,14 @@ PREFIXES = {
 }
 
 # Detect the API key and set into the dictionary
-def detect_provider(key: str):
+def check_api_key(key: str):
     for prefix, (provider, env_var, model) in PREFIXES.items():
         if key.startswith(prefix):
             _config["provider"] = provider
             _config["env_var"] = env_var
             _config["model"] = model
-            return provider, env_var, model
-    return None, None, None
+            return True
+    return False
 
 # Message getter and setter
 def get_message() -> dict:

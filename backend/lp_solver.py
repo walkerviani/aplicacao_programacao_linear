@@ -1,9 +1,9 @@
 from pulp import *
-from config_api import _config, detect_provider, request_ai, set_message, set_api_key
+from config_api import check_api_key, request_ai, set_message, set_api_key
 
 while(1):
     api_key = input("Digite sua chave API (provedores disponíveis: OpenRouter, Gemini): ")
-    if detect_provider(api_key) == (None, None, None):
+    if not check_api_key(api_key):
         print("Chave API inválida. Tente novamente.")
     else:
         set_api_key(api_key)
@@ -23,17 +23,17 @@ if not response.startswith("{") or not response.endswith("}"):
 no_keys = response.strip("{}").strip() # Remove {}
 parts = [p.strip() for p in no_keys.split(",", 3)]  # Split into 4 parts using ,
 
-of = parts[0] # "LpMaximize"
-of_type = LpMaximize if of == "LpMaximize" else LpMinimize
-prob = LpProblem("Problem", of_type)
+function_objective = parts[0] # "LpMaximize"
+function_objective_type = LpMaximize if function_objective == "LpMaximize" else LpMinimize
+prob = LpProblem("Problem", function_objective_type)
 
-vars_str = parts[2].split(";")  # ["x", "y"]
+variables_str = parts[2].split(";")  # ["x", "y"]
 variables = {}
-for v in vars_str:
+for v in variables_str:
     variables[v] = LpVariable(v, 0)
 
-of_str = parts[1] # "50x+30y"
-prob += eval(of_str, variables), "obj"
+function_objective_str = parts[1] # "50x+30y"
+prob += eval(function_objective_str, variables), "obj"
 
 rest_str = parts[3].split(";")  # ["4*x+2*y<=100", "3*x+2*y<=90", "y>=10"]
 for k, r in enumerate(rest_str, 1):
@@ -41,7 +41,7 @@ for k, r in enumerate(rest_str, 1):
 
 prob.solve()
 
-for variable in prob.variables():
-    print(variable.name, "=", variable.varValue)
+for v in prob.variables():
+    print(v.name, "=", v.variable_value)
 
 print("objective: ", value(prob.objective))
