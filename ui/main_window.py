@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QWidget, QLineEdit, QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton
-from result_panel import ResultPanel
+from ui.result_panel import ResultPanel
 from backend.config_api import set_api_key, set_message
 from backend.lp_solver import solve_linear_problem
 
@@ -133,6 +133,10 @@ class MainWindow(QMainWindow):
         text = self.txt_input.toPlainText() # User input text
         if not text.strip():
             self.result.setText("You need to type a valid linear programming problem")
+            return
+        
+        if not self.api_input.text().strip():
+            self.result.setText("You need to enter an API key")
             return
         
         self.result.setText("") # Clean previous message
