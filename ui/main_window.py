@@ -130,24 +130,21 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(widget)
 
     def on_send_clicked(self):
-        text = self.txt_input.toPlainText() # User text
-        message = ""
+        text = self.txt_input.toPlainText() # User input text
         if not text.strip():
-            message = "You need to type a valid linear programming problem"
-        else:
-            self.result.setText(message)
-            set_message(text)
-            try:
-                result = solve_linear_problem()
-
-                if result["success"]:
-                    self.showResult(result)
-                else:
-                    self.result.setText(f"Error:\n{result['error']}")
-                    return
-                self.result.setText("result")
-            except Exception as e:
-                self.result.setText(str(e))      
+            self.result.setText("You need to type a valid linear programming problem")
+            return
+        
+        self.result.setText("") # Clean previous message
+        set_message(text)
+        try:
+            result = solve_linear_problem()
+            if result["success"]:
+                self.showResult(result)
+            else:
+                self.result.setText(f"Error:\n{result['error']}")
+        except Exception as e:
+            self.result.setText(str(e))      
     
     def on_api_key_changed(self):
         set_api_key(self.api_input.text())
@@ -166,7 +163,7 @@ class MainWindow(QMainWindow):
         for restr in result["restrictions"]:
             message += f"{restr}\n"
         message += f"------ Non-negativity ------\n"
-        for var in result["parts"][2].split(";"):
+        for var in result["variables"]:
             message += f"{var} ≥ 0\n"
-            
-        return self.result.setText(message)
+        message+= f"Best result = {result["of_value"]}"
+        self.result.setText(message)
