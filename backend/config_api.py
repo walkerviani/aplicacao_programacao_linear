@@ -1,24 +1,25 @@
 from openai import OpenAI
 from google import genai
+from typing import Optional
 
 # Dictionary
-_config = {}
+_config: dict[str, object] = {}
 
 # API key getter and setter
-def get_api_key() -> str:
-    return _config.get("api_key")
+def get_api_key() -> Optional[str]:
+    return _config.get("api_key")  # type: ignore[return-value]
 
 def set_api_key(key: str):
     _config["api_key"] = key
 
-# Each API key provider has a specif prefix. Here are the most common and free models being set
+# Each API key provider has a specific prefix.
 PREFIXES = {
-    "AIza": ("gemini", "GEMINI_API_KEY", "gemini-2.5-flash"),
-    "sk-or-":   ("openrouter","OPENROUTER_API_KEY",  "openrouter/auto")
+    "AIza": ("gemini",      "GEMINI_API_KEY",      "gemini-2.5-flash"),
+    "sk-or-": ("openrouter",  "OPENROUTER_API_KEY",  "openrouter/auto"),
 }
 
 # Detect the API key and set into the dictionary
-def check_api_key(key: str):
+def check_api_key(key: str) -> bool:
     for prefix, (provider, env_var, model) in PREFIXES.items():
         if key.startswith(prefix):
             _config["provider"] = provider
@@ -28,8 +29,8 @@ def check_api_key(key: str):
     return False
 
 # Message getter and setter
-def get_message() -> dict:
-    return _config.get("message")
+def get_message() -> Optional[dict]:
+    return _config.get("message")  # type: ignore[return-value]
 
 def set_message(msg: str):
     reasoning_prompt = (
@@ -44,7 +45,6 @@ def set_message(msg: str):
         f"4) Liste todas as restrições com coeficientes corretos\n\n"
         f"[PROBLEMA] {msg}"
     )
-
     format_prompt_template = (
         f"Com base na análise abaixo, retorne APENAS esta linha, sem explicações, sem quebras:\n"
         f"{{tipo, função_objetivo, variáveis, restrições}}\n"
@@ -55,15 +55,17 @@ def set_message(msg: str):
         f"[EXEMPLO] {{LpMaximize, 50*x+30*y, x;y, 4*x+2*y<=100;3*x+2*y<=90;y>=10}}\n\n"
         f"[ANÁLISE]\n{{reasoning}}"
     )
-
-    _config["reasoning_prompt"]       = reasoning_prompt
+    _config["reasoning_prompt"] = reasoning_prompt
     _config["format_prompt_template"] = format_prompt_template
     _config["message"] = {"model": _config["model"]}
 
-# Executes the call and handles the AI ​response
+# Executes the call and handles the AI response
 def call_api(prompt: str) -> str:
     provider = _config.get("provider")
     model = _config.get("model")
+
+    if not isinstance(model, str):
+        return "Modelo não configurado."
 
     if provider == "gemini":
         client = genai.Client(api_key=get_api_key())
@@ -74,27 +76,28 @@ def call_api(prompt: str) -> str:
         client = OpenAI(api_key=get_api_key(), base_url="https://openrouter.ai/api/v1")
         response = client.chat.completions.create(
             model=model,
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": prompt}],
         )
-        return response.choices[0].message.content.strip()
+        content = response.choices[0].message.content
+        if content is None:
+            return "Resposta vazia da API."
+        return content.strip()
 
     return "Provider não configurado."
 
 # Execute two-shot: reasoning → formatting
-def request_ai():
+def request_ai() -> str:
     provider = _config.get("provider")
     if not provider:
         return "Configuração ausente."
-
     try:
         # Call 1: reasoning
-        reasoning = call_api(_config["reasoning_prompt"])
+        reasoning = call_api(_config["reasoning_prompt"]) # type: ignore[arg-type]
 
         # Call 2: formatting
-        format_prompt = _config["format_prompt_template"].replace("{reasoning}", reasoning)
-        result = call_api(format_prompt)
-
-        return result
-
+        format_prompt = _config["format_prompt_template"].replace(     # type: ignore[union-attr]
+            "{reasoning}", reasoning
+        )
+        return call_api(format_prompt)
     except Exception as e:
         return f"Erro na requisição: {e}"
