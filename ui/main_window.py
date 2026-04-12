@@ -1,6 +1,7 @@
-import sys # Only needed for access to command line arguments
-from PySide6.QtWidgets import QWidget, QLineEdit, QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton
-from result_panel import ResultPanel
+from PySide6.QtWidgets import QWidget, QLineEdit, QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton
+from .result_panel import ResultPanel
+from backend.config_api import set_api_key, set_message
+from backend.lp_solver import solve_linear_problem
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -142,16 +143,17 @@ class MainWindow(QMainWindow):
             message = "Loading..."
 
             self.result.setText(message)
+            set_message(text)
+            
+            try:
+                result = solve_linear_problem()
+
+                if not result["success"]:
+                    self.result.setText(f"Erro:\n{result['error']}")
+                    return
+                self.result.setText("result")
+            except Exception as e:
+                self.result.setText(e)      
     
     def on_api_key_changed(self):
-        return
-
-
-# The svs.argv allows to use command line arguments on the app
-# If not using command line arguments = QApplication([])
-app = QApplication(sys.argv) 
-
-window = MainWindow()
-window.show()  # Show the screen
-
-app.exec() # Execute the screen
+        set_api_key(self.apiInput.text())

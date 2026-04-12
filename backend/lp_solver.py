@@ -1,47 +1,50 @@
 from pulp import *
-from config_api import check_api_key, request_ai, set_message, set_api_key
+from .config_api import request_ai
 
-while(1):
-    api_key = input("Digite sua chave API (provedores disponíveis: OpenRouter, Gemini): ")
-    if not check_api_key(api_key):
-        print("Chave API inválida. Tente novamente.")
-    else:
-        set_api_key(api_key)
-        break
+def solve_linear_problem():
+    # How the response should be like: 
+    # {LpMaximize, 50*x+30*y, x;y, 4*x+2*y<=100;3*x+2*y<=90;y>=10}
 
-set_message(input("Escreva o problema de Programação Linear: "))
-response = request_ai() 
-# How the response should be like: 
-# {LpMaximize, 50*x+30*y, x;y, 4*x+2*y<=100;3*x+2*y<=90;y>=10}
-print(f"Response: {response}")
+    response = request_ai()
+    if not response.startswith("{") or not response.endswith("}"):
+            return {
+                "success": False,
+                "error": response
+            }
+    
+    try:
+        no_keys = response.strip("{}").strip() # Remove {}
+        parts = [p.strip() for p in no_keys.split(",", 3)]  # Split into 4 parts using , 
 
-if not response.startswith("{") or not response.endswith("}"):
-    print("Erro, resposta inválida.")
-    print(f"Resposta: {response}")
-    exit(1)
+        function_objective = parts[0] # "LpMaximize"
+        function_objective_type = LpMaximize if function_objective == "LpMaximize" else LpMinimize
 
-no_keys = response.strip("{}").strip() # Remove {}
-parts = [p.strip() for p in no_keys.split(",", 3)]  # Split into 4 parts using ,
+        prob = LpProblem("Problem", function_objective_type)
 
-function_objective = parts[0] # "LpMaximize"
-function_objective_type = LpMaximize if function_objective == "LpMaximize" else LpMinimize
-prob = LpProblem("Problem", function_objective_type)
+        # Variables
+        variables_str = parts[2].split(";")  # ["x", "y"]
+        variables = {}
+        for v in variables_str:
+            variables[v] = LpVariable(v, 0)
 
-variables_str = parts[2].split(";")  # ["x", "y"]
-variables = {}
-for v in variables_str:
-    variables[v] = LpVariable(v, 0)
+        # Objective Function
+        prob += eval(parts[1], {}, variables), "obj"  # "50x+30y"
 
-function_objective_str = parts[1] # "50x+30y"
-prob += eval(function_objective_str, variables), "obj"
+        # Restrictions
+        rest_str = parts[3].split(";")  # ["4*x+2*y<=100", "3*x+2*y<=90", "y>=10"]
+        for k, r in enumerate(rest_str, 1):
+            prob += eval(r, {}, variables), f"r{k}"
 
-rest_str = parts[3].split(";")  # ["4*x+2*y<=100", "3*x+2*y<=90", "y>=10"]
-for k, r in enumerate(rest_str, 1):
-    prob += eval(r, variables), f"r{k}"
+        prob.solve()
 
-prob.solve()
+        return {
+            "success": True,
+            "variables": {v.name: v.value() for v in prob.variables()},
+            "objective": value(prob.objective)
+        }
 
-for v in prob.variables():
-    print(v.name, "=", v.variable_value)
-
-print("objective: ", value(prob.objective))
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }

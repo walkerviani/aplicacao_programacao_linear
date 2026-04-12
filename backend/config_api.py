@@ -3,14 +3,26 @@ from google import genai
 from typing import Optional
 
 # Dictionary
-_config: dict[str, object] = {}
+_config = {
+    "api_key": "",
+    "model": None,
+    "provider": None,
+    "env_var": None,
+    "format_prompt_template": "",
+    "reasoning_prompt": "",
+    "message": {}
+}
 
 # API key getter and setter
 def get_api_key() -> Optional[str]:
     return _config.get("api_key")  # type: ignore[return-value]
 
+
 def set_api_key(key: str):
     _config["api_key"] = key
+
+    if not check_api_key(key):
+        raise ValueError("API key inválida ou provedor não suportado")
 
 # Each API key provider has a specific prefix.
 PREFIXES = {
@@ -95,7 +107,7 @@ def request_ai() -> str:
         reasoning = call_api(_config["reasoning_prompt"]) # type: ignore[arg-type]
 
         # Call 2: formatting
-        format_prompt = _config["format_prompt_template"].replace(     # type: ignore[union-attr]
+        format_prompt = _config["format_prompt_template"].replace( # type: ignore[union-attr]
             "{reasoning}", reasoning
         )
         return call_api(format_prompt)
