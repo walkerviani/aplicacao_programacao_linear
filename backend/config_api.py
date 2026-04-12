@@ -22,7 +22,7 @@ def set_api_key(key: str):
     _config["api_key"] = key
 
     if not check_api_key(key):
-        raise ValueError("API key inválida ou provedor não suportado")
+        raise ValueError("Invalid API key or unsupported provider")
 
 # Each API key provider has a specific prefix.
 PREFIXES = {
@@ -55,6 +55,7 @@ def set_message(msg: str):
         f"   - Só Lucro: use diretamente no FO\n"
         f"3) Identifique a função objetivo (maximizar ou minimizar)\n"
         f"4) Liste todas as restrições com coeficientes corretos\n\n"
+        f"ATENÇÂO: Não retorne não negatividade (Exemplo: x>=0, y>=0)"
         f"[PROBLEMA] {msg}"
     )
     format_prompt_template = (
@@ -77,7 +78,7 @@ def call_api(prompt: str) -> str:
     model = _config.get("model")
 
     if not isinstance(model, str):
-        return "Modelo não configurado."
+        return "Model not configured."
 
     if provider == "gemini":
         client = genai.Client(api_key=get_api_key())
@@ -92,16 +93,16 @@ def call_api(prompt: str) -> str:
         )
         content = response.choices[0].message.content
         if content is None:
-            return "Resposta vazia da API."
+            return "Empty API response."
         return content.strip()
 
-    return "Provider não configurado."
+    return "Provider not configured."
 
 # Execute two-shot: reasoning → formatting
 def request_ai() -> str:
     provider = _config.get("provider")
     if not provider:
-        return "Configuração ausente."
+        return "Missing configuration."
     try:
         # Call 1: reasoning
         reasoning = call_api(_config["reasoning_prompt"]) # type: ignore[arg-type]
@@ -112,4 +113,4 @@ def request_ai() -> str:
         )
         return call_api(format_prompt)
     except Exception as e:
-        return f"Erro na requisição: {e}"
+        return f"Request error: {e}"
