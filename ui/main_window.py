@@ -1,11 +1,23 @@
-from PySide6.QtWidgets import QWidget, QLineEdit, QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton
+from PySide6.QtWidgets import QWidget, QStackedWidget, QLineEdit, QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton
 from ui.result_panel import ResultPanel
 from backend.config_api import set_api_key, set_message
 from backend.lp_solver import solve_linear_problem
+from PySide6.QtCore import QThread, Qt, Signal, QSize
+from PySide6.QtGui import QMovie
+
+# A Worker that runs the solver in a different thread
+class SolverWorker(QThread):
+    finished = Signal(dict) # Emits the result when finished
+
+    def run(self):
+        result = solve_linear_problem()
+        self.finished.emit(result)
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.worker = None # Worker reference
 
         # Window title
         self.setWindowTitle("Linear Programming Calculation")
@@ -70,10 +82,13 @@ class MainWindow(QMainWindow):
         """)
         left_view.addWidget(self.txt_input)
 
+        self.stack = QStackedWidget()
+        self.stack.setFixedHeight(44)
+
         # Send Button
-        button = QPushButton()
-        button.setText("Send")
-        button.setStyleSheet("""
+        self.button = QPushButton()
+        self.button.setText("Send")
+        self.button.setStyleSheet("""
         QPushButton {
         background-color:#000000;
         color: #ffffff;
@@ -85,8 +100,17 @@ class MainWindow(QMainWindow):
         QPushButton:pressed{
         background-color:#555555;
         }""")
-        button.clicked.connect(self.on_send_clicked) # Set button function
-        left_view.addWidget(button)
+        self.button.clicked.connect(self.on_send_clicked) # Set button function
+        
+        self.spinner = QLabel()
+        self.spinner.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.movie = QMovie("assets/loading.gif")
+        self.movie.setScaledSize(QSize(44, 44))
+        self.spinner.setMovie(self.movie)
+
+        self.stack.addWidget(self.button) # Index 0
+        self.stack.addWidget(self.spinner) # Index 1
+        left_view.addWidget(self.stack)
 
         # Result Label Message
         msg_result = QLabel()
@@ -140,9 +164,18 @@ class MainWindow(QMainWindow):
             return
         
         self.result.setText("") # Clean previous message
+
         set_message(text) # Set the question to AI
+
+        self.set_loading(True) # Enables loading
+
+        self.worker = SolverWorker()
+        self.worker.finished.connect(self.on_solver_finished)
+        self.worker.start()
+
+    def on_solver_finished(self, result):
+        self.set_loading(False) # Disables loading
         try:
-            result = solve_linear_problem()
             if result["success"]:
                 self.showResult(result)
                 self.result_panel.update_graph()
@@ -151,6 +184,14 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.result.setText(str(e))      
     
+    def set_loading(self, is_loading: bool):
+        if is_loading:
+            self.movie.start()
+            self.stack.setCurrentIndex(1) # Show Spinner
+        else:
+            self.movie.stop()
+            self.stack.setCurrentIndex(0) # Show Button
+
     def on_api_key_changed(self):
         set_api_key(self.api_input.text())
         
