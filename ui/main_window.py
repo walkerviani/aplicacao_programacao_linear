@@ -31,12 +31,12 @@ class MainWindow(QMainWindow):
 
         apiView = QHBoxLayout()
 
+        # API Input Text
         apiMessage = QLabel()
         apiMessage.setText("API Key:")
         apiMessage.setStyleSheet("font: 16px Arial;color: #000000;")
 
         self.apiInput = QLineEdit()
-        self.apiInput.setEchoMode(QLineEdit.EchoMode.Password)
         self.apiInput.setStyleSheet("""
         font: 16px Arial;
         background-color: #ffffff;
@@ -45,14 +45,9 @@ class MainWindow(QMainWindow):
         padding: 4px; 
         """)
         self.apiInput.textChanged.connect(self.on_api_key_changed)
-        
-        self.apiChecker = QLabel()
-        self.apiChecker.setFixedSize(16, 16)
-        self.apiChecker.setStyleSheet("background-color: gray; border: 1px solid #555;")
 
         apiView.addWidget(apiMessage)
         apiView.addWidget(self.apiInput)
-        apiView.addWidget(self.apiChecker)
         leftView.addLayout(apiView)
 
         # User Input Message
