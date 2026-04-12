@@ -1,5 +1,5 @@
 import sys # Only needed for access to command line arguments
-from PySide6.QtWidgets import QWidget, QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton
+from PySide6.QtWidgets import QWidget, QLineEdit, QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton
 from result_panel import ResultPanel
 
 class MainWindow(QMainWindow):
@@ -27,6 +27,32 @@ class MainWindow(QMainWindow):
         padding-bottom:10px;
         """)
         leftView.addWidget(title)
+
+        apiView = QHBoxLayout()
+
+        apiMessage = QLabel()
+        apiMessage.setText("API Key:")
+        apiMessage.setStyleSheet("font: 16px Arial;color: #000000;")
+
+        self.apiInput = QLineEdit()
+        self.apiInput.setEchoMode(QLineEdit.EchoMode.Password)
+        self.apiInput.setStyleSheet("""
+        font: 16px Arial;
+        background-color: #ffffff;
+        color: #000000;
+        border: 1px solid #000000;
+        padding: 4px; 
+        """)
+        self.apiInput.textChanged.connect(self.on_api_key_changed)
+        
+        self.apiChecker = QLabel()
+        self.apiChecker.setFixedSize(16, 16)
+        self.apiChecker.setStyleSheet("background-color: gray; border: 1px solid #555;")
+
+        apiView.addWidget(apiMessage)
+        apiView.addWidget(self.apiInput)
+        apiView.addWidget(self.apiChecker)
+        leftView.addLayout(apiView)
 
         # User Input Message
         message1 = QLabel()
@@ -109,7 +135,16 @@ class MainWindow(QMainWindow):
 
     def on_send_clicked(self):
         text = self.textInput.toPlainText() # User text
-        self.result.setText(text)
+        message = ""
+        if not text.strip():
+            message = "You need to type a valid linear programming problem"
+        else:
+            message = "Loading..."
+
+            self.result.setText(message)
+    
+    def on_api_key_changed(self):
+        return
 
 
 # The svs.argv allows to use command line arguments on the app
