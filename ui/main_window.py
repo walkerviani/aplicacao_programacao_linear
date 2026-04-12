@@ -1,6 +1,10 @@
 import sys # Only needed for access to command line arguments
+import os
 from PySide6.QtWidgets import QWidget, QLineEdit, QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton
 from result_panel import ResultPanel
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from backend.config_api import set_api_key
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -30,12 +34,12 @@ class MainWindow(QMainWindow):
 
         apiView = QHBoxLayout()
 
+        # API Input Text
         apiMessage = QLabel()
         apiMessage.setText("API Key:")
         apiMessage.setStyleSheet("font: 16px Arial;color: #000000;")
 
         self.apiInput = QLineEdit()
-        self.apiInput.setEchoMode(QLineEdit.EchoMode.Password)
         self.apiInput.setStyleSheet("""
         font: 16px Arial;
         background-color: #ffffff;
@@ -44,14 +48,9 @@ class MainWindow(QMainWindow):
         padding: 4px; 
         """)
         self.apiInput.textChanged.connect(self.on_api_key_changed)
-        
-        self.apiChecker = QLabel()
-        self.apiChecker.setFixedSize(16, 16)
-        self.apiChecker.setStyleSheet("background-color: gray; border: 1px solid #555;")
 
         apiView.addWidget(apiMessage)
         apiView.addWidget(self.apiInput)
-        apiView.addWidget(self.apiChecker)
         leftView.addLayout(apiView)
 
         # User Input Message
@@ -144,8 +143,8 @@ class MainWindow(QMainWindow):
             self.result.setText(message)
     
     def on_api_key_changed(self):
-        return
-
+        key = self.apiInput.text().strip()
+        set_api_key(key)
 
 # The svs.argv allows to use command line arguments on the app
 # If not using command line arguments = QApplication([])
