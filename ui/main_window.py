@@ -16,7 +16,7 @@ class MainWindow(QMainWindow):
         # Split the screen in left and right
         container = QHBoxLayout()
         # Left view is the input session
-        leftView = QVBoxLayout()
+        left_view = QVBoxLayout()
 
         # App Title Label
         title = QLabel()
@@ -27,48 +27,48 @@ class MainWindow(QMainWindow):
         font-weight: bold;
         padding-bottom:10px;
         """)
-        leftView.addWidget(title)
+        left_view.addWidget(title)
 
-        apiView = QHBoxLayout()
+        api_view = QHBoxLayout()
 
         # API Input Text
-        apiMessage = QLabel()
-        apiMessage.setText("API Key:")
-        apiMessage.setStyleSheet("font: 16px Arial;color: #000000;")
+        api_message = QLabel()
+        api_message.setText("API Key:")
+        api_message.setStyleSheet("font: 16px Arial;color: #000000;")
 
-        self.apiInput = QLineEdit()
-        self.apiInput.setStyleSheet("""
+        self.api_input = QLineEdit()
+        self.api_input.setStyleSheet("""
         font: 16px Arial;
         background-color: #ffffff;
         color: #000000;
         border: 1px solid #000000;
         padding: 4px; 
         """)
-        self.apiInput.textChanged.connect(self.on_api_key_changed)
+        self.api_input.textChanged.connect(self.on_api_key_changed)
 
-        apiView.addWidget(apiMessage)
-        apiView.addWidget(self.apiInput)
-        leftView.addLayout(apiView)
+        api_view.addWidget(api_message)
+        api_view.addWidget(self.api_input)
+        left_view.addLayout(api_view)
 
         # User Input Message
-        message1 = QLabel()
-        message1.setText("Insert your problem:")
-        message1.setStyleSheet("""
+        msg_user_input = QLabel()
+        msg_user_input.setText("Insert your problem:")
+        msg_user_input.setStyleSheet("""
         font: 16px Arial;
         color: #000000;
         """)
-        leftView.addWidget(message1)
+        left_view.addWidget(msg_user_input)
 
         # User Input
-        self.textInput = QTextEdit()
-        self.textInput.setStyleSheet("""
+        self.txt_input = QTextEdit()
+        self.txt_input.setStyleSheet("""
         font: 15px Arial;
         background-color: #ffffff;
         color: #000000;
         border: 1px solid #000000;
         margin-bottom: 10px;
         """)
-        leftView.addWidget(self.textInput)
+        left_view.addWidget(self.txt_input)
 
         # Send Button
         button = QPushButton()
@@ -86,17 +86,17 @@ class MainWindow(QMainWindow):
         background-color:#555555;
         }""")
         button.clicked.connect(self.on_send_clicked) # Set button function
-        leftView.addWidget(button)
+        left_view.addWidget(button)
 
         # Result Label Message
-        message2 = QLabel()
-        message2.setText("Result:")
-        message2.setStyleSheet("""
+        msg_result = QLabel()
+        msg_result.setText("Result:")
+        msg_result.setStyleSheet("""
         font: 16px Arial;
         color: #000000;
         padding-top:20px;
         """)
-        leftView.addWidget(message2)
+        left_view.addWidget(msg_result)
 
         # Result Label
         self.result = QTextEdit()
@@ -107,21 +107,21 @@ class MainWindow(QMainWindow):
         color: #000000;
         border: 1px solid #000000;
         """)
-        leftView.addWidget(self.result)
+        left_view.addWidget(self.result)
 
         # Push all widgets to the top
-        leftView.addStretch() 
+        left_view.addStretch() 
 
         # Right view is the graphic session
-        rightView = QVBoxLayout()
+        right_view = QVBoxLayout()
         # Set a margin
-        rightView.setContentsMargins(10, 10, 10, 10)
+        right_view.setContentsMargins(10, 10, 10, 10)
 
         self.result_panel = ResultPanel()
-        rightView.addWidget(self.result_panel)
+        right_view.addWidget(self.result_panel)
 
-        container.addLayout(leftView, 1)
-        container.addLayout(rightView, 2)
+        container.addLayout(left_view, 1)
+        container.addLayout(right_view, 2)
 
         widget = QWidget()
         # App background color
@@ -130,25 +130,43 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(widget)
 
     def on_send_clicked(self):
-        text = self.textInput.toPlainText() # User text
+        text = self.txt_input.toPlainText() # User text
         message = ""
         if not text.strip():
             message = "You need to type a valid linear programming problem"
         else:
-            message = "Loading..."
-
             self.result.setText(message)
             set_message(text)
-            
             try:
                 result = solve_linear_problem()
 
-                if not result["success"]:
-                    self.result.setText(f"Erro:\n{result['error']}")
+                if result["success"]:
+                    self.showResult(result)
+                else:
+                    self.result.setText(f"Error:\n{result['error']}")
                     return
                 self.result.setText("result")
             except Exception as e:
-                self.result.setText(e)      
+                self.result.setText(str(e))      
     
     def on_api_key_changed(self):
-        set_api_key(self.apiInput.text())
+        set_api_key(self.api_input.text())
+        
+    
+    def showResult(self, result):
+        # Objective function
+        obj_fun = "Max" if result["of_type"] == "LpMaximize" else "Min"
+        
+        message = f"------- RESULT -------\n"
+        message += f"FO {obj_fun}: {result['of']}\n"
+        message += f"----- Variables -----\n"
+        for name, value in result["variables"].items():
+            message += f"{name} = {value}\n"
+        message += f"----- Restrictions -----\n"
+        for restr in result["restrictions"]:
+            message += f"{restr}\n"
+        message += f"------ Non-negativity ------\n"
+        for var in result["parts"][2].split(";"):
+            message += f"{var} ≥ 0\n"
+            
+        return self.result.setText(message)
