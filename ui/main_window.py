@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QWidget, QLineEdit, QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton
-from .result_panel import ResultPanel
+from result_panel import ResultPanel
 from backend.config_api import set_api_key, set_message
 from backend.lp_solver import solve_linear_problem
 
@@ -136,11 +136,12 @@ class MainWindow(QMainWindow):
             return
         
         self.result.setText("") # Clean previous message
-        set_message(text)
+        set_message(text) # Set the question to AI
         try:
             result = solve_linear_problem()
             if result["success"]:
                 self.showResult(result)
+                self.result_panel.update_graph()
             else:
                 self.result.setText(f"Error:\n{result['error']}")
         except Exception as e:
