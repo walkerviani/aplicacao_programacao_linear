@@ -179,7 +179,21 @@ class MainWindow(QMainWindow):
             if result["success"]:
                 self.showResult(result)
                 self.result_panel.update_graph()
+            elif "error" in result:
+                self.result.setStyleSheet("""
+                    font: 15px Arial;
+                    background-color: #ffffff;
+                    color: #FF4040;
+                    border: 1px solid #000000;
+                """)
+                self.result.setText("AI's response was not valid. Try again")
             else:
+                self.result.setStyleSheet("""
+                    font: 15px Arial;
+                    background-color: #ffffff;
+                    color: #FF4040;
+                    border: 1px solid #000000;
+                """)
                 self.result.setText(f"Error:\n{result['error']}")
         except Exception as e:
             self.result.setText(str(e))      

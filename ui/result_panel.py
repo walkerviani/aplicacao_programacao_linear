@@ -70,6 +70,14 @@ class ResultPanel(QWidget):
             # Show the legend
             self.canvas.axes.legend()
 
+            lines = get_lines()
+            all_x = [p for x_pts, _ in lines for p in x_pts]
+            all_y = [p for _, y_pts in lines for p in y_pts]
+            x_max = max(all_x) * 1.1
+            y_max = max(all_y) * 1.1
+            self.canvas.axes.set_xlim(0, x_max)
+            self.canvas.axes.set_ylim(0, y_max)
+
             # Refresh the canvas so the new plot appears on screen
             self.canvas.draw()
             

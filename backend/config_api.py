@@ -1,5 +1,6 @@
-from openai import OpenAI
+from openai import OpenAI, AuthenticationError as OpenAIAuthenticationError
 from google import genai
+from google.genai.errors import ClientError as GenAiClientError, ServerError as GenAiServerError
 from typing import Optional
 
 # Dictionary
@@ -21,8 +22,11 @@ def get_api_key() -> Optional[str]:
 def set_api_key(key: str):
     _config["api_key"] = key
 
-    if not check_api_key(key):
-        raise ValueError("Invalid API key or unsupported provider")
+    try:
+        check_api_key(key)
+    except Exception:
+        return "Invalid API key or unsupported provider. Use Gemini 2.5 Flash or Openrouter Auto. Other models are not supported"
+
 
 # Each API key provider has a specific prefix.
 PREFIXES = {
@@ -78,7 +82,7 @@ def call_api(prompt: str) -> str:
     model = _config.get("model")
 
     if not isinstance(model, str):
-        return "Model not configured."
+        return "Model not configured. Use Gemini 2.5 Flash or Openrouter Auto. Other models are not supported"
 
     if provider == "gemini":
         client = genai.Client(api_key=get_api_key())
@@ -93,16 +97,16 @@ def call_api(prompt: str) -> str:
         )
         content = response.choices[0].message.content
         if content is None:
-            return "Empty API response."
+            return "Empty AI response. Try again"
         return content.strip()
 
-    return "Provider not configured."
+    return "Provider not configured. Check your API key"
 
 # Execute two-shot: reasoning → formatting
 def request_ai() -> str:
     provider = _config.get("provider")
     if not provider:
-        return "Missing configuration."
+        return "Missing configuration. Check your API key"
     try:
         # Call 1: reasoning
         reasoning = call_api(_config["reasoning_prompt"]) # type: ignore[arg-type]
@@ -112,5 +116,33 @@ def request_ai() -> str:
             "{reasoning}", reasoning
         )
         return call_api(format_prompt)
-    except Exception as e:
-        return f"Request error: {e}"
+    except OpenAIAuthenticationError as e:
+        if e.status_code == 401:
+            return f"Invalid authentication or incorrect API key provided. Check your API key"
+        elif e.status_code == 403:
+            return "You are accessing the API from an unsupported country, region, or territory. Change your provider"  
+        elif e.status_code == 429:
+            return "You've exceeded the rate limit or sending requests too quickly"
+        elif e.status_code >= 503:
+            return "The service may be temporarily overloaded or down. Change your provider or try again later"
+        elif e.status_code >= 500:
+            return "The server had an error while processing your request. Change your provider or try again later"
+    except GenAiClientError as e:
+        if e.code == 400:
+            return "Invalid argument. Check your API key"
+        elif e.code == 403:
+            return "Your API key doesn't have the required permissions. Check your API key"
+        elif e.code == 404:
+            return "The requested resource wasn't found. Try again"
+        elif e.code == 429:
+            return "You've exceeded the rate limit. Change your provider, your API key or try again later"
+    except GenAiServerError as e:
+        if e.code >= 504:
+            return "Your prompt (or context) is too large to be processed in time"
+        elif e.code >= 503:
+            return "The service may be temporarily overloaded or down. Change your provider or try again later"
+        elif e.code >= 500:
+            return "An unexpected error occurred on Google's side. Change your provider or try again later"
+        
+        
+    return "An unexpected error occurred. Try again"
