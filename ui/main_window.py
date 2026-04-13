@@ -4,6 +4,8 @@ from backend.config_api import set_api_key, set_message
 from backend.lp_solver import solve_linear_problem
 from PySide6.QtCore import QThread, Qt, Signal, QSize
 from PySide6.QtGui import QMovie, QIcon
+import os
+import sys
 
 # A Worker that runs the solver in a different thread
 class SolverWorker(QThread):
@@ -13,6 +15,10 @@ class SolverWorker(QThread):
         result = solve_linear_problem()
         self.finished.emit(result)
 
+def resource_path(relative_path):
+    """ Returns the absolute path to the resource, supported by PyInstaller """
+    base_path = getattr(sys, '_MEIPASS', os.path.abspath("."))
+    return os.path.join(base_path, relative_path)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -22,7 +28,7 @@ class MainWindow(QMainWindow):
         # Window title
         self.setWindowTitle("Linear Programming Calculation")
 
-        self.setWindowIcon(QIcon("assets/icon.svg"))
+        self.setWindowIcon(QIcon(resource_path("assets/icon.ico")))
 
         # Set the minimum screen size
         self.setMinimumSize(800,600)
@@ -106,7 +112,7 @@ class MainWindow(QMainWindow):
         
         self.spinner = QLabel()
         self.spinner.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.movie = QMovie("assets/loading.gif")
+        self.movie = QMovie(resource_path("assets/loading.gif"))
         self.movie.setScaledSize(QSize(44, 44))
         self.spinner.setMovie(self.movie)
 
@@ -188,7 +194,7 @@ class MainWindow(QMainWindow):
                     color: #FF4040;
                     border: 1px solid #000000;
                 """)
-                self.result.setText("AI's response was not valid. Try again")
+                self.result.setText(result["error"])
             else:
                 self.result.setStyleSheet("""
                     font: 15px Arial;
@@ -216,14 +222,21 @@ class MainWindow(QMainWindow):
         # Objective function
         obj_fun = "Max" if result["of_type"] == "LpMaximize" else "Min"
         
+        self.result.setStyleSheet("""
+            font: 15px Arial;
+            background-color: #ffffff;
+            color: #000000;
+            border: 1px solid #000000;
+        """)
+        
         message = f"------- RESULT -------\n"
         message += f"FO {obj_fun}: {result['of']}\n"
         message += f"----- Variables -----\n"
         for name, value in result["variables"].items():
             message += f"{name} = {value}\n"
-        message += f"----- Restrictions -----\n"
-        for restr in result["restrictions"]:
-            message += f"{restr}\n"
+        message += f"----- Contraints -----\n"
+        for constraint in result["constraints"]:
+            message += f"{constraint}\n"
         message += f"------ Non-negativity ------\n"
         for var in result["variables"]:
             message += f"{var} ≥ 0\n"

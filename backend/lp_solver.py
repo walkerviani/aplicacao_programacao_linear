@@ -8,7 +8,7 @@ _result = {
     "of": None,
     "of_value": None,
     "of_type": None,
-    "restrictions": [],
+    "constraints": [],
     "parts": []
 }
 
@@ -21,10 +21,18 @@ def solve_linear_problem():
     # How the response should be like: 
     # {LpMaximize, 50*x+30*y, x;y, 4*x+2*y<=100;3*x+2*y<=90;y>=10}
     response = request_ai()
+
+    # Check if follows the pattern {   }
+    response = response.strip()
     if not response.startswith("{") or not response.endswith("}"):
+        _result = {"success": False, "error": response}
+        return _result
+    
+    # Check if the problem is valid
+    if response == "{}":
         _result = {
             "success": False,
-            "error": response
+            "error": "This doesn't seem to be a Linear Programming problem"
         }
         return _result
 
@@ -46,10 +54,18 @@ def solve_linear_problem():
         # Objective Function
         prob += eval(parts[1], {}, variables), "obj"  # Ex: "50*x+30*y"
 
-        # Restrictions
-        restrictions = parts[3].split(";")  # Ex: ["4*x+2*y<=100", "3*x+2*y<=90", "y>=10"]
-        for k, r in enumerate(restrictions, 1):
-            prob += eval(r, {}, variables), f"r{k}"
+        # Constraints
+        constraints = parts[3].split(";")  # Ex: ["4*x+2*y<=100", "3*x+2*y<=90", "y>=10"]
+        for k, c in enumerate(constraints, 1):
+            match = re.search(r'(<=|>=|=)(.*)$', c)
+            if not match or match.group(2).strip() == "":
+                _result = {
+                    "success": False,
+                    "error": f"Invalid AI-generated constraint: '{c}'. Try again"
+                }
+                return _result
+            prob += eval(c, {}, variables), f"r{k}"
+
         prob.solve()
 
         _result = {
@@ -58,7 +74,7 @@ def solve_linear_problem():
             "of": prob.objective, # Ex: "50*x+30*y"
             "of_value": value(prob.objective), # Ex: 800.0 
             "of_type": parts[0], # Ex: "LpMaximize"
-            "restrictions": restrictions, # Ex: ["4*x+2*y<=100", "3*x+2*y<=90", "y>=10"]
+            "constraints": constraints, # Ex: ["4*x+2*y<=100", "3*x+2*y<=90", "y>=10"]
             "parts": parts
         }
         return _result
@@ -66,6 +82,6 @@ def solve_linear_problem():
     except Exception as e:
         _result = {
             "success": False,
-            "error": str(e)
+            "error": "AI's answer is wrong. Try again"
         }
         return _result

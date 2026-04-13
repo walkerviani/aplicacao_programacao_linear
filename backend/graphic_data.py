@@ -4,7 +4,7 @@ import re
 def get_lines():
     result = get_result()
     variables = result["parts"][2].split(";") # Ex: ["x", "y"]
-    restrictions = result["restrictions"] # Ex: ["3*x+2*y<=90", ...]
+    constraints = result["constraints"] # Ex: ["3*x+2*y<=90", ...]
     
     # Take the optimal values ​​to define the visual range
     obj_vars_values = list(result["variables"].values())
@@ -13,8 +13,8 @@ def get_lines():
 
     lines = []
 
-    for k, restriction in enumerate(restrictions):
-        equation = re.sub(r"<=|>=|<|>", "=", restriction)  # Ex: "3*x+2*y=90"
+    for constraint in constraints:
+        equation = re.sub(r"<=|>=|<|>", "=", constraint)  # Ex: "3*x+2*y=90"
         left_side, right_side = equation.split("=")
         right_side = float(right_side)
 

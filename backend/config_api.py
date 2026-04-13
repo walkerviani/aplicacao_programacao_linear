@@ -74,6 +74,7 @@ def set_message(msg: str):
     format_prompt = (
         "Com base na análise abaixo, retorne APENAS esta linha, sem explicações, sem quebras de linha:\n\n"
         "{tipo, função_objetivo, variáveis, restrições}\n\n"
+        "ATENÇÃO: Se o texto não for um problema de Programação Linear válido, retorne apenas: {}\n"
         "Regras de formatação:\n"
         "- tipo: 'LpMaximize' ou 'LpMinimize'\n"
         "- função_objetivo: ex: 3.5*x+4*y  (sem espaços)\n"
