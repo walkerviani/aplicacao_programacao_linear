@@ -3,7 +3,7 @@ from ui.result_panel import ResultPanel
 from backend.config_api import set_api_key, set_message
 from backend.lp_solver import solve_linear_problem
 from PySide6.QtCore import QThread, Qt, Signal, QSize
-from PySide6.QtGui import QMovie
+from PySide6.QtGui import QMovie, QIcon
 
 # A Worker that runs the solver in a different thread
 class SolverWorker(QThread):
@@ -21,7 +21,9 @@ class MainWindow(QMainWindow):
 
         # Window title
         self.setWindowTitle("Linear Programming Calculation")
-        
+
+        self.setWindowIcon(QIcon("assets/icon.svg"))
+
         # Set the minimum screen size
         self.setMinimumSize(800,600)
 
@@ -149,7 +151,7 @@ class MainWindow(QMainWindow):
 
         widget = QWidget()
         # App background color
-        widget.setStyleSheet("background-color: #E3E3E3")
+        widget.setStyleSheet("background-color: #CCCCCC")
         widget.setLayout(container)
         self.setCentralWidget(widget)
 
