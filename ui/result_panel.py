@@ -62,7 +62,7 @@ class ResultPanel(QWidget):
             x_optimal = obj_vars_values[0]
             y_optimal = obj_vars_values[1]
             self.canvas.axes.plot(x_optimal, y_optimal, 
-                            marker='*',
+                            marker='.',
                             markersize=15,
                             color='red', 
                             label=f'Optimal: ({x_optimal}, {y_optimal})')

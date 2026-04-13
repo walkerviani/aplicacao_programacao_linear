@@ -9,7 +9,7 @@ _config = {
     "model": None,
     "provider": None,
     "env_var": None,
-    "format_prompt_template": "",
+    "format_prompt": "",
     "reasoning_prompt": "",
     "message": {}
 }
@@ -50,30 +50,44 @@ def get_message() -> Optional[dict]:
 
 def set_message(msg: str):
     reasoning_prompt = (
-        f"Analise este problema de Programação Linear e estruture os dados:\n"
-        f"1) Monte uma tabela: Variável | Preço | Custo | Margem% | Lucro | Recursos consumidos | Limites\n"
-        f"2) Calcule o lucro de cada variável:\n"
-        f"   - Preço + Custo: lucro = preço - custo\n"
-        f"   - Preço + Custo + Margem: lucro = preço / (1.0 + margem%) - custo\n"
-        f"   - Lucro + Margem (sem preço): custo = lucro / (1.0 + margem%); use lucro informado no FO\n"
-        f"   - Só Lucro: use diretamente no FO\n"
-        f"3) Identifique a função objetivo (maximizar ou minimizar)\n"
-        f"4) Liste todas as restrições com coeficientes corretos\n\n"
-        f"ATENÇÂO: Não retorne não negatividade (Exemplo: x>=0, y>=0)"
-        f"[PROBLEMA] {msg}"
+        f"Analise este problema de Programação Linear e estruture os dados:\n\n"
+        f"PASSO 1 - Monte uma tabela:\n"
+        f"Variável | Preço | Custo | Margem% | Lucro | Recursos consumidos | Limites\n\n"
+        f"PASSO 2 -Identifique o tipo de dado fornecido (uma das opções abaixo) e calcule o lucro:\n"
+        f"   CASO A - Preço + Custo: lucro = preço - custo\n"
+        f"   CASO B - Preço + Custo + Margem: lucro = preço / (1 + margem%) - custo\n"
+        f"   CASO C - Lucro + Margem (sem preço): custo = lucro / (1 + margem%)\n"
+        f"   CASO D - Só Lucro: usar diretamente\n"
+        f"   → Indique qual CASO se aplica antes de calcular.\n"
+        f"PASSO 3 - Identifique a função objetivo:\n"
+        f"   → Escreva se é maximizar ou minimizar e monte a expressão com os lucros calculados.\n\n"
+        f"PASSO 4 - Liste todas as restrições com coeficientes corretos.\n\n"
+        f"PASSO 5 - Validação (responda cada item):\n"
+        f"   a) O número de coeficientes em cada restrição bate com o número de variáveis?\n"
+        f"   b) A função objetivo contém todas as variáveis listadas?\n"
+        f"   c) Os sinais das restrições estão corretos (<=, >= ou =)?\n"
+        f"   d) Os valores calculados fazem sentido com o enunciado?\n\n"
+        f"ATENÇÃO: Não inclua restrições de não negatividade (ex: x>=0, y>=0)\n\n"
+        f"[PROBLEMA]\n{msg}"
     )
-    format_prompt_template = (
-        f"Com base na análise abaixo, retorne APENAS esta linha, sem explicações, sem quebras:\n"
-        f"{{tipo, função_objetivo, variáveis, restrições}}\n"
-        f"- tipo: 'LpMaximize' ou 'LpMinimize'\n"
-        f"- função_objetivo: ex: 3.5*x+4*y\n"
-        f"- variáveis: separadas por ';', ex: x;y\n"
-        f"- restrições: separadas por ';', ex: 5*x+4*y<=1200;x>=0\n"
-        f"[EXEMPLO] {{LpMaximize, 50*x+30*y, x;y, 4*x+2*y<=100;3*x+2*y<=90;y>=10}}\n\n"
-        f"[ANÁLISE]\n{{reasoning}}"
+
+    format_prompt = (
+        "Com base na análise abaixo, retorne APENAS esta linha, sem explicações, sem quebras de linha:\n\n"
+        "{tipo, função_objetivo, variáveis, restrições}\n\n"
+        "Regras de formatação:\n"
+        "- tipo: 'LpMaximize' ou 'LpMinimize'\n"
+        "- função_objetivo: ex: 3.5*x+4*y  (sem espaços)\n"
+        "- variáveis: separadas por ';', ex: x;y\n"
+        "- restrições: separadas por ';', ex: 5*x+4*y<=1200;x>=0\n\n"
+        f"ANTES de retornar, verifique:\n"
+        f"- O número de coeficientes em cada restrição bate com o número de variáveis?\n"
+        f"- A função objetivo tem todas as variáveis listadas?\n"
+        "[EXEMPLO]\n"
+        "{LpMaximize, 50*x+30*y, x;y, 4*x+2*y<=100;3*x+2*y<=90;y>=10}\n\n"
+        "[ANÁLISE]\n{reasoning}"
     )
     _config["reasoning_prompt"] = reasoning_prompt
-    _config["format_prompt_template"] = format_prompt_template
+    _config["format_prompt"] = format_prompt
     _config["message"] = {"model": _config["model"]}
 
 # Executes the call and handles the AI response
@@ -112,7 +126,7 @@ def request_ai() -> str:
         reasoning = call_api(_config["reasoning_prompt"]) # type: ignore[arg-type]
 
         # Call 2: formatting
-        format_prompt = _config["format_prompt_template"].replace( # type: ignore[union-attr]
+        format_prompt = _config["format_prompt"].replace( # type: ignore[union-attr]
             "{reasoning}", reasoning
         )
         return call_api(format_prompt)
