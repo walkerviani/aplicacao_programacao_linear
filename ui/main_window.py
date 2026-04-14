@@ -164,10 +164,22 @@ class MainWindow(QMainWindow):
     def on_send_clicked(self):
         text = self.txt_input.toPlainText() # User input text
         if not text.strip():
+            self.result.setStyleSheet("""
+                    font: 15px Arial;
+                    background-color: #ffffff;
+                    color: #000000;
+                    border: 1px solid #000000;
+                """)
             self.result.setText("You need to type a valid linear programming problem")
             return
         
         if not self.api_input.text().strip():
+            self.result.setStyleSheet("""
+                    font: 15px Arial;
+                    background-color: #ffffff;
+                    color: #000000;
+                    border: 1px solid #000000;
+                """)
             self.result.setText("You need to enter an API key")
             return
         
@@ -185,6 +197,12 @@ class MainWindow(QMainWindow):
         self.set_loading(False) # Disables loading
         try:
             if result["success"]:
+                self.result.setStyleSheet("""
+                    font: 15px Arial;
+                    background-color: #ffffff;
+                    color: #000000;
+                    border: 1px solid #000000;
+                """)
                 self.showResult(result)
                 self.result_panel.update_graph()
             elif "error" in result:
@@ -234,7 +252,7 @@ class MainWindow(QMainWindow):
         message += f"----- Variables -----\n"
         for name, value in result["variables"].items():
             message += f"{name} = {value}\n"
-        message += f"----- Contraints -----\n"
+        message += f"----- Constraints -----\n"
         for constraint in result["constraints"]:
             message += f"{constraint}\n"
         message += f"------ Non-negativity ------\n"
