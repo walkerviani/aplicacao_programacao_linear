@@ -48,44 +48,49 @@ class ResultPanel(QWidget):
         self.show_message("No data to display.")
 
     def update_graph(self):
-        # Clear the previous plot before drawing a new one
-        self.canvas.axes.clear()
-        result = get_result()
-        num_vars = len(result["parts"][2].split(";"))
-        if num_vars == 2:
-            # Plot each constraint
-            for i, (x, y) in enumerate(get_lines()):
-                self.canvas.axes.plot(x, y, label=f'Constraint {i+1}')
-            
-            # Plot the objective function
-            obj_vars_values = list(result["variables"].values()) # Ex: [10.0, 20.0]
-            x_optimal = obj_vars_values[0]
-            y_optimal = obj_vars_values[1]
-            self.canvas.axes.plot(x_optimal, y_optimal, 
-                            marker='.',
-                            markersize=15,
-                            color='red', 
-                            label=f'Optimal: ({x_optimal}, {y_optimal})')
-            
-            # Show the legend
-            self.canvas.axes.legend()
+        try:
+            # Clear the previous plot before drawing a new one
+            self.canvas.axes.clear()
+            result = get_result()
+            num_vars = len(result["parts"][2].split(";")) # Number of index in the array
 
-            lines = get_lines()
-            all_x = [p for x_pts, _ in lines for p in x_pts]
-            all_y = [p for _, y_pts in lines for p in y_pts]
-            x_max = max(all_x) * 1.1
-            y_max = max(all_y) * 1.1
-            self.canvas.axes.set_xlim(0, x_max)
-            self.canvas.axes.set_ylim(0, y_max)
-
-            # Refresh the canvas so the new plot appears on screen
-            self.canvas.draw()
+            if num_vars == 0 or num_vars == 1:
+                self.show_message("Something went wrong.\nTry Again!")
+            elif num_vars == 2:
+                # Plot each constraint
+                for i, (x, y) in enumerate(get_lines()):
+                    self.canvas.axes.plot(x, y, label=f'Constraint {i+1}')
             
-            # Switch the stack to show the graph (index 0)
-            self.stack.setCurrentIndex(0)
-        else:
-            self.show_message("Graph not available for problems\nwith more than 2 variables.")
+                # Plot the objective function
+                obj_vars_values = list(result["variables"].values()) # Ex: [10.0, 20.0]
+                x_optimal = obj_vars_values[0]
+                y_optimal = obj_vars_values[1]
+                self.canvas.axes.plot(x_optimal, y_optimal, 
+                        marker='.',
+                        markersize=15,
+                        color='red', 
+                        label=f'Optimal: ({x_optimal}, {y_optimal})')
+            
+                # Show the legend
+                self.canvas.axes.legend()
 
+                lines = get_lines()
+                all_x = [p for x_pts, _ in lines for p in x_pts]
+                all_y = [p for _, y_pts in lines for p in y_pts]
+                x_max = max(all_x) * 1.1
+                y_max = max(all_y) * 1.1
+                self.canvas.axes.set_xlim(0, x_max)
+                self.canvas.axes.set_ylim(0, y_max)
+
+                # Refresh the canvas so the new plot appears on screen
+                self.canvas.draw()
+            
+                # Switch the stack to show the graph (index 0)
+                self.stack.setCurrentIndex(0)
+            else:
+                self.show_message("Graph not available for problems\nwith more than 2 variables.")
+        except Exception as e:
+            self.show_message("Something went wrong.\nTry Again!")
 
     def show_message(self, text):
         # Update the message label text
