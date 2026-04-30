@@ -19,19 +19,24 @@ def get_api_key() -> Optional[str]:
     return _config.get("api_key")  # type: ignore[return-value]
 
 
-def set_api_key(key: str):
+def set_api_key(key: str) -> Optional[str]:
     _config["api_key"] = key
 
+    if not check_api_key(key):
+        return "Invalid API key or unsupported provider. Use Gemini 2.5 Flash or Openrouter Auto. Other models are not supported"
+
     try:
-        check_api_key(key)
+        _validate_api_key(key)
     except Exception:
         return "Invalid API key or unsupported provider. Use Gemini 2.5 Flash or Openrouter Auto. Other models are not supported"
+
+    return None
 
 
 # Each API key provider has a specific prefix.
 PREFIXES = {
     "AIza": ("gemini",      "GEMINI_API_KEY",      "gemini-2.5-flash"),
-    "sk-or-": ("openrouter",  "OPENROUTER_API_KEY",  "openrouter/auto"),
+    "sk-or-": ("openrouter",  "OPENROUTER_API_KEY",  "openrouter/free"),
 }
 
 # Detect the API key and set into the dictionary
@@ -44,11 +49,30 @@ def check_api_key(key: str) -> bool:
             return True
     return False
 
+
+# Perform a lightweight validation call to confirm if the key actually works
+def _validate_api_key(key: str) -> None:
+    provider = _config.get("provider")
+    model = _config.get("model")
+
+    if provider == "gemini":
+        client = genai.Client(api_key=key)
+        client.models.generate_content(model=model, contents="ping")
+
+    elif provider == "openrouter":
+        client = OpenAI(api_key=key, base_url="https://openrouter.ai/api/v1")
+        client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "ping"}],
+            max_tokens=1,
+        )
+
+
 # Message getter and setter
 def get_message() -> Optional[dict]:
     return _config.get("message")  # type: ignore[return-value]
 
-def set_message(msg: str):
+def set_message(msg: str) -> None:
     reasoning_prompt = (
         f"Analise este problema de Programação Linear e estruture os dados:\n\n"
         f"PASSO 1 - Monte uma tabela:\n"
@@ -131,17 +155,20 @@ def request_ai() -> str:
             "{reasoning}", reasoning
         )
         return call_api(format_prompt)
+
     except OpenAIAuthenticationError as e:
         if e.status_code == 401:
-            return f"Invalid authentication or incorrect API key provided. Check your API key"
+            return "Invalid authentication or incorrect API key provided. Check your API key"
         elif e.status_code == 403:
-            return "You are accessing the API from an unsupported country, region, or territory. Change your provider"  
+            return "You are accessing the API from an unsupported country, region, or territory. Change your provider"
         elif e.status_code == 429:
             return "You've exceeded the rate limit or sending requests too quickly"
         elif e.status_code >= 503:
             return "The service may be temporarily overloaded or down. Change your provider or try again later"
         elif e.status_code >= 500:
             return "The server had an error while processing your request. Change your provider or try again later"
+        return "An unexpected error occurred. Try again"
+
     except GenAiClientError as e:
         if e.code == 400:
             return "Invalid argument. Check your API key"
@@ -151,6 +178,8 @@ def request_ai() -> str:
             return "The requested resource wasn't found. Try again"
         elif e.code == 429:
             return "You've exceeded the rate limit. Change your provider, your API key or try again later"
+        return "An unexpected error occurred. Try again"
+
     except GenAiServerError as e:
         if e.code >= 504:
             return "Your prompt (or context) is too large to be processed in time"
@@ -158,6 +187,7 @@ def request_ai() -> str:
             return "The service may be temporarily overloaded or down. Change your provider or try again later"
         elif e.code >= 500:
             return "An unexpected error occurred on Google's side. Change your provider or try again later"
-        
-        
-    return "An unexpected error occurred. Try again"
+        return "An unexpected error occurred. Try again"
+
+    except Exception:
+        return "An unexpected error occurred. Try again"

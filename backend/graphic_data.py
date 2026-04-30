@@ -1,22 +1,35 @@
 from .lp_solver import get_result
 import re
 
-def get_lines():
+def get_lines() -> list:
     result = get_result()
+
+    if not result.get("success"):
+        return []
+
     variables = result["parts"][2].split(";") # Ex: ["x", "y"]
     constraints = result["constraints"] # Ex: ["3*x+2*y<=90", ...]
-    
-    # Take the optimal values ​​to define the visual range
+
+    # Take the optimal values to define the visual range
     obj_vars_values = list(result["variables"].values())
-    x_max = obj_vars_values[0] * 3
-    y_max = obj_vars_values[1] * 3
+
+    # Guard against zero optimal values to avoid invisible lines in the graph
+    x_max = max(obj_vars_values[0] * 3, 10) if len(obj_vars_values) > 0 else 10
+    y_max = max(obj_vars_values[1] * 3, 10) if len(obj_vars_values) > 1 else 10
 
     lines = []
-
     for constraint in constraints:
         equation = re.sub(r"<=|>=|<|>", "=", constraint)  # Ex: "3*x+2*y=90"
+
+        if "=" not in equation:
+            continue
+
         left_side, right_side = equation.split("=")
-        right_side = float(right_side)
+
+        try:
+            right_side = float(right_side)
+        except ValueError:
+            continue
 
         x = eval(left_side, {}, {variables[0]: 1, variables[1]: 0})
         y = eval(left_side, {}, {variables[0]: 0, variables[1]: 1})
@@ -37,4 +50,5 @@ def get_lines():
             y_pts = [y_val, y_val]
 
         lines.append((x_pts, y_pts))
+
     return lines

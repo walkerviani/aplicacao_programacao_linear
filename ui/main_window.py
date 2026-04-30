@@ -15,6 +15,18 @@ class SolverWorker(QThread):
         result = solve_linear_problem()
         self.finished.emit(result)
 
+# A Worker that validates the API key in a different thread
+class ApiKeyWorker(QThread):
+    finished = Signal(str) # Emits an error message or empty string if valid
+
+    def __init__(self, key: str):
+        super().__init__()
+        self.key = key
+
+    def run(self):
+        error = set_api_key(self.key)
+        self.finished.emit(error or "")
+
 def resource_path(relative_path):
     """ Returns the absolute path to the resource, supported by PyInstaller """
     base_path = getattr(sys, '_MEIPASS', os.path.abspath("."))
@@ -24,6 +36,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.worker = None # Worker reference
+        self.api_worker = None # API key worker reference
 
         # Window title
         self.setWindowTitle("Linear Programming Calculation")
@@ -66,9 +79,35 @@ class MainWindow(QMainWindow):
         """)
         self.api_input.textChanged.connect(self.on_api_key_changed)
 
+        # API key validate button
+        self.api_button = QPushButton("Validate")
+        self.api_button.setFixedHeight(34)
+        self.api_button.setStyleSheet("""
+        QPushButton {
+        background-color:#000000;
+        color: #ffffff;
+        padding: 4px 10px;
+        }
+        QPushButton:hover{
+        background-color:#333333;
+        }
+        QPushButton:pressed{
+        background-color:#555555;
+        }
+        QPushButton:disabled{
+        background-color:#999999;
+        }""")
+        self.api_button.clicked.connect(self.on_api_validate_clicked)
+
         api_view.addWidget(api_message)
         api_view.addWidget(self.api_input)
+        api_view.addWidget(self.api_button)
         left_view.addLayout(api_view)
+
+        # API key validation feedback label
+        self.api_status = QLabel()
+        self.api_status.setStyleSheet("font: 13px Arial; color: #000000;")
+        left_view.addWidget(self.api_status)
 
         # User Input Message
         msg_user_input = QLabel()
@@ -233,9 +272,57 @@ class MainWindow(QMainWindow):
             self.stack.setCurrentIndex(0) # Show Button
 
     def on_api_key_changed(self):
-        set_api_key(self.api_input.text())
-        
-    
+        # Only store the key — validation happens on button click
+        self.api_input.setStyleSheet("""
+        font: 16px Arial;
+        background-color: #ffffff;
+        color: #000000;
+        border: 1px solid #000000;
+        padding: 4px;
+        """)
+        self.api_status.setText("")
+
+    def on_api_validate_clicked(self):
+        key = self.api_input.text().strip()
+        if not key:
+            self.api_status.setStyleSheet("font: 13px Arial; color: #FF4040;")
+            self.api_status.setText("Enter an API key first")
+            return
+
+        self.api_button.setEnabled(False)
+        self.api_button.setText("Validating...")
+        self.api_status.setStyleSheet("font: 13px Arial; color: #000000;")
+        self.api_status.setText("")
+
+        self.api_worker = ApiKeyWorker(key)
+        self.api_worker.finished.connect(self.on_api_validated)
+        self.api_worker.start()
+
+    def on_api_validated(self, error: str):
+        self.api_button.setEnabled(True)
+        self.api_button.setText("Validate")
+
+        if error:
+            self.api_input.setStyleSheet("""
+            font: 16px Arial;
+            background-color: #ffffff;
+            color: #000000;
+            border: 1px solid #FF4040;
+            padding: 4px;
+            """)
+            self.api_status.setStyleSheet("font: 13px Arial; color: #FF4040;")
+            self.api_status.setText(error)
+        else:
+            self.api_input.setStyleSheet("""
+            font: 16px Arial;
+            background-color: #ffffff;
+            color: #000000;
+            border: 1px solid #1a6fb5;
+            padding: 4px;
+            """)
+            self.api_status.setStyleSheet("font: 13px Arial; color: #1a6fb5;")
+            self.api_status.setText("API key validated successfully")
+
     def showResult(self, result):
         # Objective function
         obj_fun = "Max" if result["of_type"] == "LpMaximize" else "Min"
