@@ -7,8 +7,11 @@ def get_lines() -> list:
     if not result.get("success"):
         return []
 
-    variables = result["parts"][2].split(";") # Ex: ["x", "y"]
-    constraints = result["constraints"] # Ex: ["3*x+2*y<=90", ...]
+    variables = result["parts"][2]
+    constraints = result["constraints"]
+
+    if len(variables) < 2:
+        return []
 
     # Take the optimal values to define the visual range
     obj_vars_values = list(result["variables"].values())
@@ -18,8 +21,9 @@ def get_lines() -> list:
     y_max = max(obj_vars_values[1] * 3, 10) if len(obj_vars_values) > 1 else 10
 
     lines = []
+
     for constraint in constraints:
-        equation = re.sub(r"<=|>=|<|>", "=", constraint)  # Ex: "3*x+2*y=90"
+        equation = re.sub(r"(<=|>=|<|>)", "=", constraint)
 
         if "=" not in equation:
             continue
@@ -31,22 +35,27 @@ def get_lines() -> list:
         except ValueError:
             continue
 
-        x = eval(left_side, {}, {variables[0]: 1, variables[1]: 0})
-        y = eval(left_side, {}, {variables[0]: 0, variables[1]: 1})
+        try:
+            coef_x = eval(left_side, {}, {variables[0]: 1, variables[1]: 0})
+            coef_y = eval(left_side, {}, {variables[0]: 0, variables[1]: 1})
+        except Exception:
+            continue
 
-        if y != 0 and x != 0:
-            # Diagonal line: connects Y-intercept to X-intercept
-            x_pts = [0.0, right_side / x]
-            y_pts = [right_side / y, 0.0]
-        elif y == 0:
-            # Vertical line: x = constant
-            x_val = right_side / x
+        if coef_x == 0 and coef_y == 0:
+            continue
+
+        if coef_y != 0 and coef_x != 0:
+            x_pts = [0.0, right_side / coef_x]
+            y_pts = [right_side / coef_y, 0.0]
+
+        elif coef_y == 0:
+            x_val = right_side / coef_x
             x_pts = [x_val, x_val]
-            y_pts = [0.0, y_max] # Uses y_max of the graph
+            y_pts = [0.0, y_max]
+
         else:
-            # Horizontal line: y = constant
-            y_val = right_side / y
-            x_pts = [0.0, x_max]  # Uses x_max of the graph
+            y_val = right_side / coef_y
+            x_pts = [0.0, x_max]
             y_pts = [y_val, y_val]
 
         lines.append((x_pts, y_pts))

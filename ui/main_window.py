@@ -37,6 +37,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.worker = None # Worker reference
         self.api_worker = None # API key worker reference
+        self.api_key_valid = False 
 
         # Window title
         self.setWindowTitle("Linear Programming Calculation")
@@ -107,6 +108,8 @@ class MainWindow(QMainWindow):
         # API key validation feedback label
         self.api_status = QLabel()
         self.api_status.setStyleSheet("font: 13px Arial; color: #000000;")
+        self.api_status.setWordWrap(True)
+        self.api_status.setMaximumWidth(600)
         left_view.addWidget(self.api_status)
 
         # User Input Message
@@ -212,14 +215,14 @@ class MainWindow(QMainWindow):
             self.result.setText("You need to type a valid linear programming problem")
             return
         
-        if not self.api_input.text().strip():
+        if not self.api_key_valid:
             self.result.setStyleSheet("""
                     font: 15px Arial;
                     background-color: #ffffff;
                     color: #000000;
                     border: 1px solid #000000;
                 """)
-            self.result.setText("You need to enter an API key")
+            self.result.setText("You need to validate your API key first")
             return
         
         self.result.setText("") # Clean previous message
@@ -272,6 +275,8 @@ class MainWindow(QMainWindow):
             self.stack.setCurrentIndex(0) # Show Button
 
     def on_api_key_changed(self):
+        self.api_key_valid = False
+
         # Only store the key — validation happens on button click
         self.api_input.setStyleSheet("""
         font: 16px Arial;
@@ -303,6 +308,8 @@ class MainWindow(QMainWindow):
         self.api_button.setText("Validate")
 
         if error:
+            self.api_key_valid = False
+            
             self.api_input.setStyleSheet("""
             font: 16px Arial;
             background-color: #ffffff;
@@ -313,6 +320,8 @@ class MainWindow(QMainWindow):
             self.api_status.setStyleSheet("font: 13px Arial; color: #FF4040;")
             self.api_status.setText(error)
         else:
+            self.api_key_valid = True 
+            
             self.api_input.setStyleSheet("""
             font: 16px Arial;
             background-color: #ffffff;
@@ -345,5 +354,5 @@ class MainWindow(QMainWindow):
         message += f"------ Non-negativity ------\n"
         for var in result["variables"]:
             message += f"{var} ≥ 0\n"
-        message+= f"Best result = {result["of_value"]}"
+        message+= f"Best result = {round(result['of_value'], 4)}"
         self.result.setText(message)

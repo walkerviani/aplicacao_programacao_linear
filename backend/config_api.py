@@ -3,6 +3,8 @@ from google import genai
 from google.genai.errors import ClientError as GenAiClientError, ServerError as GenAiServerError
 from typing import Optional
 
+import httpx
+
 # Dictionary
 _config = {
     "api_key": "",
@@ -23,20 +25,20 @@ def set_api_key(key: str) -> Optional[str]:
     _config["api_key"] = key
 
     if not check_api_key(key):
-        return "Invalid API key or unsupported provider. Use Gemini 2.5 Flash or Openrouter Auto. Other models are not supported"
+        return "Invalid API key or unsupported provider. Use Gemini 2.5 Flash or Openrouter Free. Other models are not supported"
 
     try:
         _validate_api_key(key)
     except Exception:
-        return "Invalid API key or unsupported provider. Use Gemini 2.5 Flash or Openrouter Auto. Other models are not supported"
+        return "Invalid API key or unsupported provider. Use Gemini 2.5 Flash or Openrouter Free. Other models are not supported"
 
     return None
 
 
 # Each API key provider has a specific prefix.
 PREFIXES = {
-    "AIza": ("gemini",      "GEMINI_API_KEY",      "gemini-2.5-flash"),
-    "sk-or-": ("openrouter",  "OPENROUTER_API_KEY",  "openrouter/free"),
+    "AIza": ("gemini", "GEMINI_API_KEY", "gemini-2.5-flash"),
+    "sk-or-": ("openrouter", "OPENROUTER_API_KEY", "openrouter/free"),
 }
 
 # Detect the API key and set into the dictionary
@@ -56,11 +58,18 @@ def _validate_api_key(key: str) -> None:
     model = _config.get("model")
 
     if provider == "gemini":
-        client = genai.Client(api_key=key)
+        client = genai.Client(
+        api_key=get_api_key(),
+        http_options={"timeout": 60}  # 60 seconds
+    )
         client.models.generate_content(model=model, contents="ping")
 
     elif provider == "openrouter":
-        client = OpenAI(api_key=key, base_url="https://openrouter.ai/api/v1")
+        client = OpenAI(
+        api_key=get_api_key(),
+        base_url="https://openrouter.ai/api/v1",
+        timeout=120.0
+        )
         client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": "ping"}],
@@ -74,41 +83,62 @@ def get_message() -> Optional[dict]:
 
 def set_message(msg: str) -> None:
     reasoning_prompt = (
-        f"Analise este problema de Programação Linear e estruture os dados:\n\n"
+        f"Analise este problema de Programação Linear e estruture os dados.\n\n"
+        f"ATENÇÃO: Se o problema já estiver parcialmente ou totalmente resolvido, "
+        f"com função objetivo e restrições explícitas, use os valores fornecidos diretamente "
+        f"sem recalcular. Apenas valide e estruture.\n\n"
         f"PASSO 1 - Monte uma tabela:\n"
         f"Variável | Preço | Custo | Margem% | Lucro | Recursos consumidos | Limites\n\n"
-        f"PASSO 2 -Identifique o tipo de dado fornecido (uma das opções abaixo) e calcule o lucro:\n"
+        f"PASSO 2 - Identifique o tipo de dado fornecido (uma das opções abaixo) e calcule o lucro:\n"
         f"   CASO A - Preço + Custo: lucro = preço - custo\n"
         f"   CASO B - Preço + Custo + Margem: lucro = preço / (1 + margem%) - custo\n"
         f"   CASO C - Lucro + Margem (sem preço): custo = lucro / (1 + margem%)\n"
         f"   CASO D - Só Lucro: usar diretamente\n"
-        f"   → Indique qual CASO se aplica antes de calcular.\n"
+        f"   CASO E - Preço + múltiplos custos: lucro = preço - soma(quantidade_i * custo_i)\n"
+        f"   → Indique qual CASO se aplica antes de calcular.\n\n"
         f"PASSO 3 - Identifique a função objetivo:\n"
         f"   → Escreva se é maximizar ou minimizar e monte a expressão com os lucros calculados.\n\n"
-        f"PASSO 4 - Liste todas as restrições com coeficientes corretos.\n\n"
-        f"PASSO 5 - Validação (responda cada item):\n"
+        f"PASSO 4 - Liste TODOS os recursos mencionados no enunciado como restrições:\n"
+        f"   → Para cada recurso citado (tempo, matéria-prima, estoque, capacidade), "
+        f"crie uma restrição separada.\n"
+        f"   → Se um recurso aparece no enunciado mas não vira restrição, justifique.\n\n"
+        f"PASSO 5 - Conferência cruzada:\n"
+        f"   → Releia o enunciado e marque cada dado numérico usado.\n"
+        f"   → Algum dado numérico ficou sem uso? Se sim, ele deve virar restrição ou coeficiente.\n\n"
+        f"PASSO 6 - Validação (responda cada item):\n"
         f"   a) O número de coeficientes em cada restrição bate com o número de variáveis?\n"
         f"   b) A função objetivo contém todas as variáveis listadas?\n"
         f"   c) Os sinais das restrições estão corretos (<=, >= ou =)?\n"
-        f"   d) Os valores calculados fazem sentido com o enunciado?\n\n"
+        f"   d) Os valores calculados fazem sentido com o enunciado?\n"
+        f"   e) Todos os dados numéricos do enunciado foram usados?\n\n"
         f"ATENÇÃO: Não inclua restrições de não negatividade (ex: x>=0, y>=0)\n\n"
         f"[PROBLEMA]\n{msg}"
     )
 
     format_prompt = (
-        "Com base na análise abaixo, retorne APENAS esta linha, sem explicações, sem quebras de linha:\n\n"
-        "{tipo, função_objetivo, variáveis, restrições}\n\n"
-        "ATENÇÃO: Se o texto não for um problema de Programação Linear válido, retorne apenas: {}\n"
-        "Regras de formatação:\n"
-        "- tipo: 'LpMaximize' ou 'LpMinimize'\n"
-        "- função_objetivo: ex: 3.5*x+4*y  (sem espaços)\n"
-        "- variáveis: separadas por ';', ex: x;y\n"
-        "- restrições: separadas por ';', ex: 5*x+4*y<=1200;x>=0\n\n"
-        f"ANTES de retornar, verifique:\n"
-        f"- O número de coeficientes em cada restrição bate com o número de variáveis?\n"
-        f"- A função objetivo tem todas as variáveis listadas?\n"
-        "[EXEMPLO]\n"
-        "{LpMaximize, 50*x+30*y, x;y, 4*x+2*y<=100;3*x+2*y<=90;y>=10}\n\n"
+        "Com base na análise abaixo, retorne APENAS um JSON válido. "
+        "Sem explicações, sem texto antes ou depois.\n\n"
+        "Formato esperado:\n"
+        "{\n"
+        '  "type": "LpMaximize",\n'
+        '  "objective": "50*x+30*y",\n'
+        '  "variables": ["x", "y"],\n'
+        '  "constraints": ["4*x+2*y<=100", "3*x+2*y<=90"]\n'
+        "}\n\n"
+        "Regras:\n"
+        "- type: deve ser exatamente 'LpMaximize' ou 'LpMinimize'\n"
+        "- objective: string sem espaços\n"
+        "- variables: lista de nomes de variáveis\n"
+        "- constraints: lista de restrições\n"
+        "- NÃO incluir restrições de não negatividade (ex: x>=0)\n"
+        "- Usar ponto para decimais (3.5 e não 3,5)\n"
+        "- NÃO usar markdown (sem ```)\n"
+        "- NÃO incluir explicações\n\n"
+        "Se não for um problema válido, retorne exatamente:\n"
+        '"INVALID"\n\n'
+        "ANTES de retornar, verifique:\n"
+        "- O número de coeficientes em cada restrição bate com o número de variáveis?\n"
+        "- A função objetivo contém todas as variáveis?\n\n"
         "[ANÁLISE]\n{reasoning}"
     )
     _config["reasoning_prompt"] = reasoning_prompt
@@ -124,12 +154,19 @@ def call_api(prompt: str) -> str:
         return "Model not configured. Use Gemini 2.5 Flash or Openrouter Auto. Other models are not supported"
 
     if provider == "gemini":
-        client = genai.Client(api_key=get_api_key())
+        client = genai.Client(
+            api_key=get_api_key(),
+            http_options={"timeout": 120}
+        )
         response = client.models.generate_content(model=model, contents=prompt)
         return response.text.strip()
 
     elif provider == "openrouter":
-        client = OpenAI(api_key=get_api_key(), base_url="https://openrouter.ai/api/v1")
+        client = OpenAI(
+            api_key=get_api_key(),
+            base_url="https://openrouter.ai/api/v1",
+            timeout=120.0
+        )
         response = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
@@ -138,7 +175,6 @@ def call_api(prompt: str) -> str:
         if content is None:
             return "Empty AI response. Try again"
         return content.strip()
-
     return "Provider not configured. Check your API key"
 
 # Execute two-shot: reasoning → formatting
@@ -154,8 +190,9 @@ def request_ai() -> str:
         format_prompt = _config["format_prompt"].replace( # type: ignore[union-attr]
             "{reasoning}", reasoning
         )
-        return call_api(format_prompt)
-
+        return call_api(format_prompt) 
+    except httpx.TimeoutException:
+        return "Request timed out. Check your connection or try again"
     except OpenAIAuthenticationError as e:
         if e.status_code == 401:
             return "Invalid authentication or incorrect API key provided. Check your API key"

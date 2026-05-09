@@ -52,7 +52,7 @@ class ResultPanel(QWidget):
             # Clear the previous plot before drawing a new one
             self.canvas.axes.clear()
             result = get_result()
-            num_vars = len(result["parts"][2].split(";")) # Number of index in the array
+            num_vars = len(result["parts"][2]) # Number of index in the array
 
             if num_vars == 0 or num_vars == 1:
                 self.show_message("Something went wrong.\nTry Again!")
@@ -91,6 +91,7 @@ class ResultPanel(QWidget):
                 self.show_message("Graph not available for problems\nwith more than 2 variables.")
         except Exception as e:
             self.show_message("Something went wrong.\nTry Again!")
+            print(e) # Print error for debug
 
     def show_message(self, text):
         # Update the message label text
