@@ -1,4 +1,5 @@
 import pulp
+from pulp import COIN_CMD
 from .config_api import request_ai
 import re
 import json
@@ -32,7 +33,7 @@ def solve_linear_problem() -> dict:
         }
 
     # Check if AI flagged as invalid LP problem
-    if response == "INVALID":
+    if response.strip('"') == "INVALID":
         return {
             "success": False,
             "error": "This doesn't seem to be a Linear Programming problem"
@@ -150,7 +151,7 @@ def solve_linear_problem() -> dict:
                     "error": f"Failed to parse constraint: '{c}'"
                 }
 
-        prob.solve()
+        prob.solve(COIN_CMD(path=get_cbc_path(), msg=0))
 
         # Validate objective exists
         if prob.objective is None:
@@ -180,3 +181,23 @@ def solve_linear_problem() -> dict:
 def extract_json(text: str) -> str:
     match = re.search(r'\{.*\}', text, re.DOTALL)
     return match.group(0) if match else ""
+
+def insert_multiplication(expr: str) -> str:
+    # # Insert * between number and variable: 1.5x → 1.5*x
+    return re.sub(r'(\d)([a-zA-Z])', r'\1*\2', expr)
+
+import os
+import sys
+
+def get_cbc_path():
+    base_dir = os.path.dirname(sys.executable)
+    
+    path = os.path.join(base_dir, "cbc", "cbc.exe")
+
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            f"cbc.exe not found in: {path}\n"
+            f"Make sure the /cbc folder is included with the executable."
+        )
+
+    return path

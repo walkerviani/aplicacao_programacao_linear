@@ -1,8 +1,5 @@
 from openai import OpenAI, AuthenticationError as OpenAIAuthenticationError
-from google import genai
-from google.genai.errors import ClientError as GenAiClientError, ServerError as GenAiServerError
 from typing import Optional
-
 import httpx
 
 # Dictionary
@@ -25,20 +22,15 @@ def set_api_key(key: str) -> Optional[str]:
     _config["api_key"] = key
 
     if not check_api_key(key):
-        return "Invalid API key or unsupported provider. Use Gemini 2.5 Flash or Openrouter Free. Other models are not supported"
-
-    try:
-        _validate_api_key(key)
-    except Exception:
-        return "Invalid API key or unsupported provider. Use Gemini 2.5 Flash or Openrouter Free. Other models are not supported"
+        return "Invalid API key or unsupported provider."
 
     return None
 
 
 # Each API key provider has a specific prefix.
 PREFIXES = {
-    "AIza": ("gemini", "GEMINI_API_KEY", "gemini-2.5-flash"),
     "sk-or-": ("openrouter", "OPENROUTER_API_KEY", "openrouter/free"),
+    "sk-": ("deepseek", "DEEPSEEK_API_KEY", "deepseek-v4-flash"),
 }
 
 # Detect the API key and set into the dictionary
@@ -50,31 +42,6 @@ def check_api_key(key: str) -> bool:
             _config["model"] = model
             return True
     return False
-
-
-# Perform a lightweight validation call to confirm if the key actually works
-def _validate_api_key(key: str) -> None:
-    provider = _config.get("provider")
-    model = _config.get("model")
-
-    if provider == "gemini":
-        client = genai.Client(
-        api_key=get_api_key(),
-        http_options={"timeout": 60}  # 60 seconds
-    )
-        client.models.generate_content(model=model, contents="ping")
-
-    elif provider == "openrouter":
-        client = OpenAI(
-        api_key=get_api_key(),
-        base_url="https://openrouter.ai/api/v1",
-        timeout=120.0
-        )
-        client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": "ping"}],
-            max_tokens=1,
-        )
 
 
 # Message getter and setter
@@ -98,6 +65,9 @@ def set_message(msg: str) -> None:
         f"   → Indique qual CASO se aplica antes de calcular.\n\n"
         f"PASSO 3 - Identifique a função objetivo:\n"
         f"   → Escreva se é maximizar ou minimizar e monte a expressão com os lucros calculados.\n\n"
+        f"ATENÇÃO CRÍTICA: Os coeficientes das restrições devem ser os consumos de recursos "
+        f"(kg, minutos, unidades), NUNCA preços ou lucros.\n"
+        f"Exemplo correto: se cada mesa consome 8kg de madeira → coeficiente na restrição de madeira é 8.\n\n"
         f"PASSO 4 - Liste TODOS os recursos mencionados no enunciado como restrições:\n"
         f"   → Para cada recurso citado (tempo, matéria-prima, estoque, capacidade), "
         f"crie uma restrição separada.\n"
@@ -151,80 +121,51 @@ def call_api(prompt: str) -> str:
     model = _config.get("model")
 
     if not isinstance(model, str):
-        return "Model not configured. Use Gemini 2.5 Flash or Openrouter Auto. Other models are not supported"
+        return "Model not configured. Use Deepseek v4 Flash or Openrouter Free."
 
-    if provider == "gemini":
-        client = genai.Client(
-            api_key=get_api_key(),
-            http_options={"timeout": 120}
-        )
-        response = client.models.generate_content(model=model, contents=prompt)
-        return response.text.strip()
+    if provider == "openrouter":
+        base_url = "https://openrouter.ai/api/v1"
+    elif provider == "deepseek":
+        base_url = "https://api.deepseek.com/v1"
+    else:
+        return "Provider not configured. Check your API key"
 
-    elif provider == "openrouter":
-        client = OpenAI(
-            api_key=get_api_key(),
-            base_url="https://openrouter.ai/api/v1",
-            timeout=120.0
-        )
-        response = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        content = response.choices[0].message.content
-        if content is None:
-            return "Empty AI response. Try again"
-        return content.strip()
-    return "Provider not configured. Check your API key"
+    client = OpenAI(
+        api_key=get_api_key(),
+        base_url=base_url,
+        timeout=120.0
+    )
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    content = response.choices[0].message.content
+    if content is None:
+        return "Empty AI response. Try again"
+    return content.strip()
 
 # Execute two-shot: reasoning → formatting
 def request_ai() -> str:
-    provider = _config.get("provider")
-    if not provider:
+    if not _config.get("provider"):
         return "Missing configuration. Check your API key"
     try:
-        # Call 1: reasoning
-        reasoning = call_api(_config["reasoning_prompt"]) # type: ignore[arg-type]
+        reasoning = call_api(_config["reasoning_prompt"])
+        format_prompt = _config["format_prompt"].replace("{reasoning}", reasoning)
+        return call_api(format_prompt)
 
-        # Call 2: formatting
-        format_prompt = _config["format_prompt"].replace( # type: ignore[union-attr]
-            "{reasoning}", reasoning
-        )
-        return call_api(format_prompt) 
     except httpx.TimeoutException:
         return "Request timed out. Check your connection or try again"
     except OpenAIAuthenticationError as e:
         if e.status_code == 401:
             return "Invalid authentication or incorrect API key provided. Check your API key"
         elif e.status_code == 403:
-            return "You are accessing the API from an unsupported country, region, or territory. Change your provider"
+            return "You are accessing the API from an unsupported country, region, or territory"
         elif e.status_code == 429:
             return "You've exceeded the rate limit or sending requests too quickly"
         elif e.status_code >= 503:
-            return "The service may be temporarily overloaded or down. Change your provider or try again later"
+            return "The service may be temporarily overloaded or down. Try again later"
         elif e.status_code >= 500:
-            return "The server had an error while processing your request. Change your provider or try again later"
+            return "The server had an error while processing your request. Try again later"
         return "An unexpected error occurred. Try again"
-
-    except GenAiClientError as e:
-        if e.code == 400:
-            return "Invalid argument. Check your API key"
-        elif e.code == 403:
-            return "Your API key doesn't have the required permissions. Check your API key"
-        elif e.code == 404:
-            return "The requested resource wasn't found. Try again"
-        elif e.code == 429:
-            return "You've exceeded the rate limit. Change your provider, your API key or try again later"
-        return "An unexpected error occurred. Try again"
-
-    except GenAiServerError as e:
-        if e.code >= 504:
-            return "Your prompt (or context) is too large to be processed in time"
-        elif e.code >= 503:
-            return "The service may be temporarily overloaded or down. Change your provider or try again later"
-        elif e.code >= 500:
-            return "An unexpected error occurred on Google's side. Change your provider or try again later"
-        return "An unexpected error occurred. Try again"
-
-    except Exception:
-        return "An unexpected error occurred. Try again"
+    except Exception as e:
+        return f"An unexpected error occurred: {e}"

@@ -9,7 +9,7 @@ def main():
     # Tells Windows to treat this as its own app, separate from Python
     if sys.platform == "win32":
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-            "linear-programming-calculation"
+            "linear_programming_application"
         )
 
     app = QApplication(sys.argv)
